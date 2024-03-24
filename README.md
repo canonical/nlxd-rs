@@ -1,4 +1,8 @@
-# nlxd
+# nlxd-rs
+
+A Rust crate for working with the LXD API.
+
+*This is a work in progress; not an official Canonical product.*
 
 ## Developing
 
