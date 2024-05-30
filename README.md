@@ -2,7 +2,7 @@
 
 A Rust crate for working with the LXD API.
 
-*This is a work in progress; not an official Canonical product.*
+*Please note: this project is in early development and not yet ready for use.*
 
 ## Developing
 
