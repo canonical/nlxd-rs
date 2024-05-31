@@ -1,3 +1,4 @@
+use std::env;
 use std::fmt::Display;
 
 #[derive(Debug)]
@@ -30,4 +31,7 @@ enum ErrorImpl {
 
     #[error("isahc web client error")]
     IsahcError(#[from] isahc::Error),
+
+    #[error("environment variable error")]
+    EnvVar(#[from] env::VarError),
 }

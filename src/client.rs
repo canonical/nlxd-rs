@@ -15,7 +15,10 @@
 use isahc::{config::Dialer, prelude::*, HttpClient, Request};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
-use std::{env, path::PathBuf};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 
 use crate::{instance::Instance, Result};
 
@@ -39,41 +42,36 @@ pub enum Endpoint {
     UnixSocket(PathBuf),
 }
 
-/// Return the environment variable if set and nonempty, else None.
-fn nonempty_env_var(key: &str) -> Option<String> {
-    match env::var(key) {
-        Ok(v) => {
-            if v.is_empty() {
-                None
-            } else {
-                Some(v)
-            }
-        }
-        Err(_) => None,
-    }
-}
-
-impl Default for Endpoint {
+impl Endpoint {
     /// Autodetect the unix socket path for the local lxd daemon.
     /// It will return the first that satisfies:
-    /// 1. `LXD_SOCKET` env var if set to a nonempty string
-    /// 2. `LXD_DIR` env var if set to a nonempty string
+    /// 1. `LXD_SOCKET` env var if set
+    /// 2. `LXD_DIR` env var if set
     /// 3. `/var/snap/lxd/common/lxd/unix.socket` (lxd snap) if path exists
-    /// 4. otherwise fall back to `/var/snap/lxd/common/lxd/unix.socket` (lxd package)
-    fn default() -> Self {
-        let lxd_snap_socket_path = PathBuf::from("/var/snap/lxd/common/lxd/unix.socket");
-        let lxd_package_socket_path = PathBuf::from("/var/snap/lxd/common/lxd/unix.socket");
+    /// 4. otherwise fall back to `/var/lib/lxd/unix.socket` (lxd package)
+    ///
+    /// Return an error if invalid UTF8 is encountered when reading environment variables.
+    pub fn autodetect_local() -> Result<Self> {
+        fn try_get_env_var(name: &str) -> Result<Option<String>> {
+            match env::var(name) {
+                Err(env::VarError::NotPresent) => Ok(None),
+                Err(x) => Err(x.into()),
+                Ok(s) => Ok(Some(s)),
+            }
+        }
 
-        let socket: PathBuf = if let Some(socket) = nonempty_env_var("LXD_SOCKET") {
+        let lxd_snap_socket_path = Path::new("/var/snap/lxd/common/lxd/unix.socket");
+        let lxd_package_socket_path = Path::new("/var/lib/lxd/unix.socket");
+        let socket = if let Some(socket) = try_get_env_var("LXD_SOCKET")? {
             PathBuf::from(socket)
-        } else if let Some(lxd_dir) = nonempty_env_var("LXD_DIR") {
+        } else if let Some(lxd_dir) = try_get_env_var("LXD_DIR")? {
             PathBuf::from(&lxd_dir).join("unix.socket")
         } else if lxd_snap_socket_path.exists() {
-            lxd_snap_socket_path
+            lxd_snap_socket_path.to_owned()
         } else {
-            lxd_package_socket_path
+            lxd_package_socket_path.to_owned()
         };
-        Endpoint::UnixSocket(socket)
+        Ok(Endpoint::UnixSocket(socket))
     }
 }
 
@@ -151,15 +149,15 @@ pub struct ClientConfig {
     pub project: String,
 }
 
-impl Default for ClientConfig {
-    fn default() -> Self {
-        Self {
-            endpoint: Endpoint::default(),
+impl ClientConfig {
+    pub fn default_autodetect_local() -> Result<Self> {
+        Ok(Self {
+            endpoint: Endpoint::autodetect_local()?,
             version: LxdAPIVersion::default(),
             verify: true,
             timeout: Timeout::default(),
             project: "default".to_owned(),
-        }
+        })
     }
 }
 
