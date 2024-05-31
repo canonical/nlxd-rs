@@ -21,7 +21,7 @@ use serde::Deserialize;
 // NOTE: this can be moved to a shared types file later.
 /// https://github.com/canonical/lxd/blob/main/doc/architectures.md
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "lowercase")]
 pub enum Arch {
     I686,
     X86_64,
@@ -52,7 +52,7 @@ pub struct Image {
     auto_update: bool,
     /// Whether the image is an automatically cached remote image
     cached: bool,
-    // TODO: these should be datetimes - added in https://github.com/NucciTheBoss/nlxd/pull/19/files#diff-2e9d962a08321605940b5a657135052fbcef87b5e360662bb527c96d9a615542
+    // TODO: these should be datetimes - added in https://github.com/canonical/nlxd-rs/pull/15
     created_at: String,
     expires_at: String,
     filename: String,
@@ -104,8 +104,8 @@ pub struct ImageSource {
 /// - https://documentation.ubuntu.com/lxd/to/latest/howto/images_remote/
 /// - https://documentation.ubuntu.com/lxd/to/latest/reference/remote_image_servers/#remote-image-servers
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "lowercase")]
 pub enum RemoteImageProtocol {
     Lxd,
-    Simplestreams,
+    SimpleStreams,
 }
