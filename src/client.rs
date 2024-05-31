@@ -201,7 +201,7 @@ impl Client {
             .metadata)
     }
 
-    /// Try to get an instance by its name.
+    /// Get an instance by name.
     pub fn get_instance(&self, name: &str) -> Result<Instance> {
         Ok(self.get(name)?.metadata)
     }
