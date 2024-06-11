@@ -18,6 +18,8 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
+use crate::utils::empty_string_as_none;
+
 // NOTE: this can be moved to a shared types file later.
 /// https://github.com/canonical/lxd/blob/main/doc/architectures.md
 #[derive(Debug, Deserialize)]
@@ -95,7 +97,8 @@ pub struct ImageSource {
     /// NOTE: lxd api docs say:
     /// Type of image (container or virtual-machine).
     /// However this field has observed to also be an empty string.
-    image_type: String,
+    #[serde(deserialize_with = "empty_string_as_none")]
+    image_type: Option<ImageType>,
     protocol: RemoteImageProtocol,
     server: String,
 }

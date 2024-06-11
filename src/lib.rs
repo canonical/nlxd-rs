@@ -17,5 +17,6 @@ mod error;
 mod images;
 mod instance;
 mod result;
+mod utils;
 
 pub use crate::{error::Error, result::Result};
