@@ -44,6 +44,7 @@ pub enum Device {
 
 /// Code from the REST API for instance status.
 /// Codes documented at https://documentation.ubuntu.com/lxd/en/latest/rest-api/#status-codes
+#[non_exhaustive]
 #[derive(Debug, Deserialize_repr)]
 #[repr(u16)]
 pub enum InstanceStatus {
