@@ -51,12 +51,12 @@ impl Endpoint {
     /// 4. otherwise fall back to `/var/lib/lxd/unix.socket` (lxd package)
     ///
     /// Return an error if invalid UTF8 is encountered when reading environment variables.
-    pub fn autodetect_local() -> Result<Self> {
+    pub fn detect_local() -> Result<Self> {
         fn try_get_env_var(name: &str) -> Result<Option<String>> {
             match env::var(name) {
                 Err(env::VarError::NotPresent) => Ok(None),
-                Err(x) => Err(x.into()),
-                Ok(s) => Ok(Some(s)),
+                Err(e) => Err(e.into()),
+                Ok(x) => Ok(Some(x)),
             }
         }
 
@@ -150,9 +150,9 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    pub fn default_autodetect_local() -> Result<Self> {
+    pub fn default_with_detect_local() -> Result<Self> {
         Ok(Self {
-            endpoint: Endpoint::autodetect_local()?,
+            endpoint: Endpoint::detect_local()?,
             version: LxdAPIVersion::default(),
             verify: true,
             timeout: Timeout::default(),
