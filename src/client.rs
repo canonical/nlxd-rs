@@ -15,6 +15,10 @@
 use isahc::{config::Dialer, prelude::*, HttpClient, Request};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 
 use crate::{instance::Instance, Result};
 
@@ -35,13 +39,39 @@ struct Cert {
 #[allow(unused)]
 pub enum Endpoint {
     Http(String),
-    UnixSocket(String),
+    UnixSocket(PathBuf),
 }
 
-impl Default for Endpoint {
-    fn default() -> Self {
-        // TODO: implement default for endpoint, autodetecting the local lxd socket
-        Endpoint::UnixSocket("/var/snap/lxd/common/lxd/unix.socket".to_owned())
+impl Endpoint {
+    /// Autodetect the unix socket path for the local lxd daemon.
+    /// It will return the first that satisfies:
+    /// 1. `LXD_SOCKET` env var if set
+    /// 2. `LXD_DIR` env var if set
+    /// 3. `/var/snap/lxd/common/lxd/unix.socket` (lxd snap) if path exists
+    /// 4. otherwise fall back to `/var/lib/lxd/unix.socket` (lxd package)
+    ///
+    /// Return an error if invalid UTF8 is encountered when reading environment variables.
+    pub fn detect_local() -> Result<Self> {
+        fn try_get_env_var(name: &str) -> Result<Option<String>> {
+            match env::var(name) {
+                Err(env::VarError::NotPresent) => Ok(None),
+                Err(e) => Err(e.into()),
+                Ok(x) => Ok(Some(x)),
+            }
+        }
+
+        let lxd_snap_socket_path = Path::new("/var/snap/lxd/common/lxd/unix.socket");
+        let lxd_package_socket_path = Path::new("/var/lib/lxd/unix.socket");
+        let socket = if let Some(socket) = try_get_env_var("LXD_SOCKET")? {
+            PathBuf::from(socket)
+        } else if let Some(lxd_dir) = try_get_env_var("LXD_DIR")? {
+            PathBuf::from(&lxd_dir).join("unix.socket")
+        } else if lxd_snap_socket_path.exists() {
+            lxd_snap_socket_path.to_owned()
+        } else {
+            lxd_package_socket_path.to_owned()
+        };
+        Ok(Endpoint::UnixSocket(socket))
     }
 }
 
@@ -119,15 +149,15 @@ pub struct ClientConfig {
     pub project: String,
 }
 
-impl Default for ClientConfig {
-    fn default() -> Self {
-        Self {
-            endpoint: Endpoint::default(),
+impl ClientConfig {
+    pub fn default_with_detect_local() -> Result<Self> {
+        Ok(Self {
+            endpoint: Endpoint::detect_local()?,
             version: LxdAPIVersion::default(),
             verify: true,
             timeout: Timeout::default(),
             project: "default".to_owned(),
-        }
+        })
     }
 }
 
