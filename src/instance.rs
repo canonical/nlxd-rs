@@ -16,7 +16,9 @@
 
 use std::collections::HashMap;
 
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use serde_repr::Deserialize_repr;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -40,21 +42,51 @@ pub enum Device {
     },
 }
 
-// TODO: deny unknown fields once Instance type is complete
-// #[serde(deny_unknown_fields)]
+/// Code from the REST API for instance status.
+/// Codes documented at https://documentation.ubuntu.com/lxd/en/latest/rest-api/#status-codes
+#[non_exhaustive]
+#[derive(Debug, Deserialize_repr)]
+#[repr(u16)]
+pub enum InstanceStatus {
+    OperationCreated = 100,
+    Started = 101,
+    Stopped = 102,
+    Running = 103,
+    Canceling = 104,
+    Pending = 105,
+    Starting = 106,
+    Stopping = 107,
+    Aborting = 108,
+    Freezing = 109,
+    Frozen = 110,
+    Thawed = 111,
+    Error = 112,
+    Ready = 113,
+    Success = 200,
+    Failure = 400,
+    Canceled = 401,
+}
+
 #[allow(unused)]
 #[derive(Debug, Deserialize)]
 pub struct Instance {
+    architecture: String,
+    // TODO: determine if config is completely described.  If so, we can potentially use a struct.
+    config: HashMap<String, String>,
+    created_at: DateTime<Utc>,
+    description: String,
+    devices: HashMap<String, Device>,
+    ephemeral: bool,
+    expanded_config: HashMap<String, String>,
+    expanded_devices: HashMap<String, Device>,
+    last_used_at: DateTime<Utc>,
+    location: String,
     name: String,
+    profiles: Vec<String>,
     project: String,
     stateful: bool,
-    status: String,   // TODO: could be an enum
-    status_code: u32, // TODO: maybe also an enum?
-    location: String,
-    profiles: Vec<String>,
+    #[serde(rename = "status_code")]
+    status: InstanceStatus,
     #[serde(rename = "type")]
     instance_type: InstanceType,
-    last_used_at: String, // TODO: datetime type
-    expanded_devices: HashMap<String, Device>,
-    // TODO: the remaining fields
 }
