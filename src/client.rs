@@ -14,9 +14,13 @@
 
 use isahc::{config::Dialer, prelude::*, HttpClient, Request};
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-use crate::{instance::Instance, Result};
+use crate::instance::Operation;
+use crate::{
+    instance::{Instance, NewInstance},
+    Result,
+};
 
 #[allow(unused)]
 enum EventType {
@@ -98,6 +102,7 @@ enum ResponseType {
     Error,
 }
 
+// TODO: turn this into an enum based on the three standard return types: https://documentation.ubuntu.com/lxd/en/latest/rest-api/#return-values
 #[derive(Debug, Deserialize)]
 struct Response<T> {
     metadata: T,
@@ -107,7 +112,7 @@ struct Response<T> {
     #[serde(rename = "type")]
     response_type: ResponseType,
     #[allow(unused)]
-    // TODO: enum based on https://documentation.ubuntu.com/lxd/en/latest/rest-api/#list-of-current-status-codes
+    // TODO: enum for http codes - use serde_repr
     status_code: u32,
 }
 
@@ -165,7 +170,7 @@ impl Client {
         })
     }
 
-    // `path` is expected to begin with a slash
+    //// `path` is expected to begin with a slash
     fn get<T>(&self, path: &str) -> Result<Response<T>>
     where
         T: DeserializeOwned,
@@ -193,13 +198,67 @@ impl Client {
         Ok(response.json()?)
     }
 
+    /// `path` is expected to begin with a slash
+    fn post<T, U>(&self, path: &str, data: &U) -> Result<Response<T>>
+    where
+        T: DeserializeOwned,
+        U: ?Sized + Serialize,
+    {
+        let (request_builder, host) = match &self.endpoint {
+            Endpoint::Http(host) => {
+                // TODO: https requests will need some kind of authentication
+                (Request::builder(), host.as_str())
+            }
+            Endpoint::UnixSocket(host) => {
+                let socket = Dialer::unix_socket(host);
+                // host is arbitrarily set to 'lxd' - ignored, but required as part of the http spec
+                (Request::builder().dial(socket), "http://lxd")
+            }
+        };
+
+        let uri = format!("{}{}", host, path);
+        let body = serde_json::to_string(data)?;
+        let mut response = request_builder
+            .uri(uri)
+            .method("POST")
+            .body(body)
+            .unwrap()
+            .send()
+            .unwrap();
+        Ok(response.json()?)
+    }
+
+    /// Get a list of instance names
     pub fn instances(&self) -> Result<Vec<String>> {
-        Ok(self
+        let metadata: Vec<String> = self
             .get(&format!("{}/instances", self.version.to_url_segment()))?
+            .metadata;
+        return Ok(metadata
+            .into_iter()
+            .filter_map(|s| s.strip_prefix("/1.0/instances/").map(|s| s.to_owned()))
+            .collect());
+    }
+
+    /// Get an instance's metadata by instance name.
+    pub fn get_instance(&self, name: &str) -> Result<Instance> {
+        Ok(self
+            .get(&format!(
+                "{}/instances/{}",
+                self.version.to_url_segment(),
+                name
+            ))?
             .metadata)
     }
 
-    pub fn get_instance(&self, name: &str) -> Result<Instance> {
-        Ok(self.get(name)?.metadata)
+    /// Create a new instance, given the new instance spec.
+    /// https://documentation.ubuntu.com/lxd/en/latest/api/#/instances/instances_post
+    pub fn create_instance(&self, spec: &NewInstance) -> Result<Operation> {
+        // TODO: support project and target params (in query string)
+        Ok(self
+            .post(
+                &format!("{}/instances", self.version.to_url_segment()),
+                spec,
+            )?
+            .metadata)
     }
 }
